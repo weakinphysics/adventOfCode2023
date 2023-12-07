@@ -5,14 +5,17 @@ using namespace std;
 
 class RangeNode
 {
+    // you can completely amputate a node, or you can partially change it
 public:
     long long int range_start;
     long long int range_end;
+    bool visited;
 
     RangeNode(long long int rs, long long int re)
     {
         this->range_start = rs;
         this->range_end = re;
+        this->visited = false;
     }
 };
 
@@ -44,7 +47,6 @@ vector<RangeNode *> getSeeb(string &s)
     vector<RangeNode *> seebs;
     if (rangeCount % 2)
     {
-        cout << "what the f\n";
         return seebs;
     }
     for (int i = 0; i < rangeCount; i += 2)
@@ -55,7 +57,7 @@ vector<RangeNode *> getSeeb(string &s)
     return seebs;
 }
 
-int binarySearcher(vector<RangeNode *> &ranges, int start, int end, int target)
+int binarySearcher(vector<RangeNode *> &ranges, int start, int end, long long int target)
 {
     while (start <= end)
     {
@@ -63,7 +65,17 @@ int binarySearcher(vector<RangeNode *> &ranges, int start, int end, int target)
         if (target >= ranges[mid]->range_start)
         {
             if (target > ranges[mid]->range_end)
+            {
+                if (mid == ranges.size() - 1)
+                {
+                    if (ranges[mid]->range_end < target)
+                        return -1;
+                    return mid;
+                }
+                if (ranges[mid + 1]->range_start > target)
+                    return mid;
                 return binarySearcher(ranges, mid + 1, end, target);
+            }
             return mid;
         }
         return binarySearcher(ranges, start, mid - 1, target);
@@ -71,105 +83,207 @@ int binarySearcher(vector<RangeNode *> &ranges, int start, int end, int target)
     return -1;
 }
 
-vector<RangeNode *> insertRange(vector<RangeNode *> &ranges, vector<long long int> &range)
+vector<RangeNode *> createRanges(vector<RangeNode *> &ranges, vector<long long int> &range)
 {
-    // copy the ranges that remain unaffected
-    // we could operate on the array. or. we could do something cool
-    int n = ranges.size();
-    int index = binarySearcher(ranges, 0, n - 1, range[0]);
-    RangeNode *thisRange = new RangeNode(range[0], range[1]);
-    vector<RangeNode *> allRanges;
-
-    int j = 0;
+    int k = ranges.size();
+    int index = binarySearcher(ranges, 0, k - 1, range[0]);
+    vector<RangeNode *> news;
     if (index == -1)
     {
-        /*
-            Two possibilities:
-                1. To be appended at the end of the array
-                2. Belongs at the beginning of the array
-        */
-        if (range[0] < ranges[0]->range_start)
+        index = 0;
+        if (range[0] > ranges.back()->range_end)
+            return news;
+        while (index < k && range[1] >= ranges[index]->range_start)
         {
-            while (j < n && range[1] >= ranges[j]->range_end)
+            if (ranges[index]->visited)
             {
-                j++;
+                index++;
+                continue;
             }
-            allRanges.push_back(thisRange);
-            if (j < n)
+            long long int d = ranges[index]->range_start - range[0];
+            if (range[1] < ranges[index]->range_end)
             {
-                if (thisRange->range_end >= ranges[j]->range_start)
-                {
-                    ranges[j]->range_start = thisRange->range_end + 1;
-                }
-                for (int i = j; i < n; i++)
-                    allRanges.push_back(ranges[i]);
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[3]);
+                news.push_back(new_ranger);
+                ranges[index]->range_start = range[1] + 1;
+                break;
             }
-            return allRanges;
-        }
-        else
-        {
-            allRanges.resize(n + 1);
-            for (int i = 0; i < n; i++)
-                allRanges[i] = ranges[i];
-            ranges[n] = thisRange;
-            return allRanges;
+            else if (range[1] == ranges[index]->range_end)
+            {
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[3]);
+                news.push_back(new_ranger);
+                ranges[index]->visited = true;
+                break;
+            }
+            else
+            {
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[2] + ranges[index]->range_end - range[0]);
+                news.push_back(new_ranger);
+                ranges[index]->visited = true;
+                index++;
+                continue;
+            }
         }
     }
     else
     {
-        for (int i = 0; i < index; i++)
-            allRanges.push_back(ranges[i]);
-        allRanges.push_back(thisRange);
-        while (index < n && thisRange->range_end >= ranges[index]->range_end)
-        {
+        if (ranges[index]->range_end < range[0])
             index++;
-        }
-        if (index < n)
+        // look for all nodes that fall into this range
+        while (index < k && ranges[index]->range_start <= range[1])
         {
-            if (ranges[index]->range_start <= thisRange->range_end)
-                ranges[index]->range_start = thisRange->range_end + 1;
-            for (int i = index; i < n; i++)
-                allRanges.push_back(ranges[i]);
+            if (ranges[index]->range_start < range[0])
+            {
+                if (ranges[index]->range_end > range[1])
+                {
+                    // fix this one
+                    RangeNode *mm = new RangeNode(range[2], range[3]);
+                    long long int temp = ranges[index]->range_end;
+                    ranges[index]->range_end = range[0] - 1;
+                    news.push_back(mm);
+                    vector<RangeNode *> copy;
+                    int j = 0;
+                    while (j <= index)
+                    {
+                        copy.push_back(ranges[j]);
+                        j++;
+                    }
+                    copy.push_back(new RangeNode(range[1] + 1, temp));
+                    while (j < ranges.size())
+                    {
+                        copy.push_back(ranges[j]);
+                        j++;
+                    }
+                    while (!ranges.empty())
+                        ranges.pop_back();
+                    while (!copy.empty())
+                    {
+                        ranges.push_back(copy.back());
+                        copy.pop_back();
+                    }
+                    reverse(ranges.begin(), ranges.end());
+                    return news;
+                }
+                else if (ranges[index]->range_end == range[1])
+                {
+                    RangeNode *mm = new RangeNode(range[2], range[3]);
+                    ranges[index]->range_end = range[0] - 1;
+                    news.push_back(mm);
+                    return news;
+                }
+                else
+                {
+                    RangeNode *mm = new RangeNode(range[2], range[2] + ranges[index]->range_end - range[0]);
+                    news.push_back(mm);
+                    ranges[index]->range_end = range[0] - 1;
+                    index++;
+                    continue;
+                }
+            }
+            else if (ranges[index]->range_start == range[0])
+            {
+                if (ranges[index]->range_end > range[1])
+                {
+                    RangeNode *mm = new RangeNode(range[2], range[3]);
+                    ranges[index]->range_start = range[1] + 1;
+                    news.push_back(mm);
+                    return news;
+                }
+                else if (ranges[index]->range_end == range[1])
+                {
+                    RangeNode *mm = new RangeNode(range[2], range[3]);
+                    ranges[index]->visited = true;
+                    news.push_back(mm);
+                    return news;
+                }
+                else
+                {
+                    RangeNode *mm = new RangeNode(range[2], range[2] + ranges[index]->range_end - range[0]);
+                    news.push_back(mm);
+                    ranges[index]->visited = true;
+                    index++;
+                    continue;
+                }
+            }
+            if (ranges[index]->visited)
+            {
+                index++;
+                continue;
+            }
+            long long int d = abs(ranges[index]->range_start - range[0]);
+            if (range[1] < ranges[index]->range_end)
+            {
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[3]);
+                news.push_back(new_ranger);
+                ranges[index]->range_start = range[1] + 1;
+                break;
+            }
+            else if (range[1] == ranges[index]->range_end)
+            {
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[3]);
+                news.push_back(new_ranger);
+                ranges[index]->visited = true;
+                break;
+            }
+            else
+            {
+                RangeNode *new_ranger = new RangeNode(range[2] + d, range[2] + ranges[index]->range_end - range[0]);
+                news.push_back(new_ranger);
+                ranges[index]->visited = true;
+                index++;
+                continue;
+            }
         }
-        return allRanges;
     }
-    return allRanges;
+    return news;
 }
 
-// int main()
-// {
-//     ifstream fileHandle;
-//     fileHandle.open("./testcase.txt", ios::in);
-//     vector<string> inputlines;
-//     string s;
-//     while (fileHandle.peek() != EOF)
-//     {
-//         getline(fileHandle, s);
-//         inputlines.push_back(s);
-//     }
-//     int lines = inputlines.size();
+static bool comparator(RangeNode *a, RangeNode *b)
+{
+    return (a->range_start < b->range_start);
+}
 
-//     vector<long long int> seeds = processline(inputlines[0]);
+int newProcess(vector<RangeNode *> &ranges, vector<string> &inputlines, int line)
+{
+    int n = inputlines.size();
+    vector<RangeNode *> new_ranges;
+    int close = n;
+    for (int i = line + 1; i < n; i++)
+    {
+        if (inputlines[i] == "")
+        {
+            close = i;
+            break;
+        }
+        vector<long long int> temp = processline(inputlines[i]);
+        vector<long long int> range_temp = {temp[1], temp[1] + temp[2] - 1, temp[0], temp[0] + temp[2] - 1};
+        vector<RangeNode *> badAlgorithm = createRanges(ranges, range_temp);
+        for (auto it : badAlgorithm)
+        {
+            new_ranges.push_back(it);
+        }
+    }
+    n = ranges.size();
+    for (int i = 0; i < n; i++)
+    {
+        if (ranges[i]->visited)
+        {
+            continue;
+        }
+        else
+        {
+            new_ranges.push_back(ranges[i]);
+        }
+    }
+    sort(new_ranges.begin(), new_ranges.end(), comparator);
+    while (!ranges.empty())
+        ranges.pop_back();
 
-//     for (auto it : seeds)
-//         cout << it << " ";
-//     cout << endl;
-
-//     int n = seeds.size();
-
-//     for (int line = 1; line < lines; line++)
-//     {
-//         if (!inputlines[line].empty())
-//         {
-//             vector<int> processed(n, 0);
-//             int x = process(inputlines, seeds, processed, line);
-//             line = x;
-//         }
-//     }
-//     cout << (*min_element(seeds.begin(), seeds.end())) << endl;
-
-//     return 0;
-// }
+    int h = new_ranges.size();
+    for (int i = 0; i < h; i++)
+        ranges.push_back(new_ranges[i]);
+    return close;
+}
 
 int main()
 {
@@ -184,9 +298,28 @@ int main()
     }
     vector<RangeNode *> birbia = getSeeb(inputlines[0]);
     int k = birbia.size();
+    sort(birbia.begin(), birbia.end(), comparator);
     for (int i = 0; i < k; i++)
     {
         std::cout << birbia[i]->range_start << " " << birbia[i]->range_end << endl;
     }
+
+    int lines = inputlines.size();
+    for (int line = 1; line < lines; line++)
+    {
+        if (!inputlines[line].empty())
+        {
+            int x = newProcess(birbia, inputlines, line);
+            line = x;
+        }
+    }
+
+    cout << birbia[0]->range_start << endl;
+
+    // let us now test the algorithm by inserting a bogus range
+
+    // okay the seeds have been correctly loaded
+    // now we must process the input line by line
+
     return 0;
 }
